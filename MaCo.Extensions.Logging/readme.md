@@ -1,15 +1,15 @@
-﻿# Aghili.Logging
+﻿# MaCo.Extensions.Logging
 
-Aghili.Logging is a Dotnet library for Add simple way to log with compatibility of write in side thread.
+MaCo.Extensions.Logging is a Dotnet library for Add simple way to log with compatibility of write in side thread.
 
 ## Installation
 
-[![](https://img.shields.io/nuget/dt/Aghili.Logging.svg?style=flat-square)](https://www.nuget.org/packages/Aghili.Logging)
-[![](https://img.shields.io/nuget/v/Aghili.Logging?style=flat-square)](https://www.nuget.org/packages/Aghili.Logging)
-Use the package manager [nuget.org](https://www.nuget.org/packages/Aghili.Logging/) to install Aghili.Logging.
+[![](https://img.shields.io/nuget/dt/MaCo.Extensions.Logging.svg?style=flat-square)](https://www.nuget.org/packages/MaCo.Extensions.Logging)
+[![](https://img.shields.io/nuget/v/MaCo.Extensions.Logging?style=flat-square)](https://www.nuget.org/packages/MaCo.Extensions.Logging)
+Use the package manager [nuget.org](https://www.nuget.org/packages/MaCo.Extensions.Logging/) to install MaCo.Extensions.Logging.
 
 ```pm
-NuGet\Install-Package Aghili.Logging -Version latest
+NuGet\Install-Package MaCo.Extensions.Logging -Version latest
 ```
 
 ## How can I support ?
@@ -21,9 +21,9 @@ You can always donate your time by introducing it to others.
 
 ## Usage
 
-Using Aghili.Logging namespace
+Using MaCo.Extensions.Logging namespace
 ```cs
-using Aghili.Logging;
+using MaCo.Extensions.Logging;
 ```
 
 ### Log with multi line details

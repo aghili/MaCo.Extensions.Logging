@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -270,4 +271,10 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
     }
 
     public bool Equals(LogType other) => WriterType == other;
+
+    public void Write(LogLevel type, string path, string message)
+    {
+        path = ExecPath + "\\Log\\" + path;
+        AddEntity(path, message);
+    }
 }

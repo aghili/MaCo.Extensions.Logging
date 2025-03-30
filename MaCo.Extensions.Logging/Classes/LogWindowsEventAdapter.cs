@@ -1,4 +1,6 @@
 ﻿
+using Microsoft.Extensions.Logging;
+
 namespace Aghili.Logging.Classes;
 
 internal class LogWindowsEventAdapter : ILogWrite, IDisposable, IEquatable<LogType>
@@ -25,4 +27,8 @@ internal class LogWindowsEventAdapter : ILogWrite, IDisposable, IEquatable<LogTy
     public void Dispose() => Dispose(true);
 
     public bool Equals(LogType other) => WriterType == other;
+
+    public void Write(LogLevel type, string path, string message)
+    {
+    }
 }

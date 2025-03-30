@@ -1,4 +1,5 @@
 ﻿using Aghili.Logging.Classes;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security;
@@ -254,12 +255,107 @@ public partial class Log
         }
     }
 
+    public void WriteNew(LogLevel type, params object[] msg)
+    {
+        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(type))
+            return;
+        try
+        {
+            StackFrame caller = new StackTrace().GetFrame(1);
+            bool CallerIsValid = caller != null;
+            string ClassFullName = string.Empty;
+            string MethodName = string.Empty;
+            string FileThatContainMethod = "Unknown";
+            string ClassName = string.Empty;
+            int LineNumber = 0;
+            if (CallerIsValid)
+            {
+                MethodBase method = caller.GetMethod();
+                LineNumber = caller.GetFileLineNumber();
+                if (method != null)
+                {
+                    ClassFullName = Utilites.RemoveIligalPathChars(method.DeclaringType?.FullName);
+                    MethodName = Utilites.RemoveIligalPathChars(method.Name);
+                    FileThatContainMethod = Utilites.RemoveIligalPathChars(method.Module?.ToString());
+                    ClassName = Utilites.RemoveIligalPathChars(method.DeclaringType?.Name);
+                }
+            }
+            string path = Path.Combine(FileThatContainMethod, ClassFullName, MethodName);
+            string message = "";
+            foreach (var item in msg)
+            {
+                if (item != null)
+                {
+                    if (typeof(IEnumerable<object>).IsAssignableFrom(item.GetType()))
+                    {
+                        foreach (object message_node in (object[])item)
+                            message = message_node.ToString() + "=>";
+                    }
+                    else
+                        message = message + item.ToString() + "=>";
+                }
+            }
+
+            string HeaderDate = $"[{DateTime.Now:yyyy-MM-dd hh:mm:ss}][L:{LineNumber}]";
+            string HeaderType = $"[{type}]";
+
+            try
+            {
+                writeAdapterWrite(type, Path.Combine(path, $"{type}.log"), HeaderDate + message);
+                writeAdapterWrite(type, Path.Combine(path, "AllMessages.log"), HeaderDate + HeaderType + message);
+                writeAdapterWrite(type, "AllMessages.log", $"{HeaderDate}{HeaderType}{FileThatContainMethod}\\{ClassName}-{message}");
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
+                        $"ErrMgs  = {ex.Message}{Environment.NewLine}" +
+                        $"Date    = {HeaderDate}{Environment.NewLine}" +
+                        $"type    = {HeaderType}{Environment.NewLine}" +
+                        $"path    = {path}{Environment.NewLine}" +
+                        $"message = {message}{Environment.NewLine}" +
+                        $"module  = {FileThatContainMethod}{Environment.NewLine}" +
+                        $"DeclaringType.Name= {ClassName}{Environment.NewLine}" +
+                        $"StackTrace = {ex.StackTrace}{Environment.NewLine}" +
+                        $"----------------------------------------------------------------------------{Environment.NewLine}");
+                }
+                catch
+                {
+                }
+            }
+            finally
+            {
+            }
+        }
+        catch (StackOverflowException ex)
+        {
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
+                    $"Date      = {DateTime.Now:yyyy-MM-dd hh:mm:ss}+{Environment.NewLine}" +
+                    $"Message   = {ex}{Environment.NewLine}" +
+                    $"----------------------------------------------------------------------{Environment.NewLine}");
+            }
+            catch
+            {
+            }
+        }
+    }
+
     private void writeAdapterWrite(LogMesssageType messageType, string path, string message)
     {
         foreach (ILogWrite logWrite in LogInstance?.writeAdapter)
             logWrite.Write(messageType, path, message);
     }
-
+    private void writeAdapterWrite(LogLevel messageType, string path, string message)
+    {
+        foreach (ILogWrite logWrite in LogInstance?.writeAdapter)
+            logWrite.Write(messageType, path, message);
+    }
     public void WriteNew(Exception exIn, params object[] msg)
     {
         LogMesssageType logMesssageType = LogMesssageType.Exception;
@@ -383,46 +479,5 @@ public partial class Log
     public void Exception(Exception exIn, params object[] msg)
     {
         WriteNew(exIn, msg);
-    }
-}
-
-public sealed class MaCoLogger(
-    string name,
-    Func<ColorConsoleLoggerConfiguration> getCurrentConfig) : ILogger
-{
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => default!;
-
-    public bool IsEnabled(LogLevel logLevel) =>
-        getCurrentConfig().LogLevelToColorMap.ContainsKey(logLevel);
-
-    public void Log<TState>(
-        LogLevel logLevel,
-        EventId eventId,
-        TState state,
-        Exception? exception,
-        Func<TState, Exception?, string> formatter)
-    {
-        if (!IsEnabled(logLevel))
-        {
-            return;
-        }
-
-        ColorConsoleLoggerConfiguration config = getCurrentConfig();
-        if (config.EventId == 0 || config.EventId == eventId.Id)
-        {
-            ConsoleColor originalColor = Console.ForegroundColor;
-
-            Console.ForegroundColor = config.LogLevelToColorMap[logLevel];
-            Console.WriteLine($"[{eventId.Id,2}: {logLevel,-12}]");
-
-            Console.ForegroundColor = originalColor;
-            Console.Write($"     {name} - ");
-
-            Console.ForegroundColor = config.LogLevelToColorMap[logLevel];
-            Console.Write($"{formatter(state, exception)}");
-
-            Console.ForegroundColor = originalColor;
-            Console.WriteLine();
-        }
     }
 }

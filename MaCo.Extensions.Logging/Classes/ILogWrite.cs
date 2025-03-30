@@ -1,4 +1,6 @@
-﻿namespace Aghili.Logging.Classes;
+﻿using Microsoft.Extensions.Logging;
+
+namespace Aghili.Logging.Classes;
 
 public interface ILogWrite : IDisposable, IEquatable<LogType>
 {
@@ -7,6 +9,8 @@ public interface ILogWrite : IDisposable, IEquatable<LogType>
     LogType WriterType { get; }
 
     void Write(LogMesssageType type, string path, string message);
+
+    void Write(LogLevel type, string path, string message);
 
     event EventHandler<ShirinkEventArgs> OnShiringRise;
 }
