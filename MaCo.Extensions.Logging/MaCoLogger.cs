@@ -30,5 +30,28 @@ namespace MaCo.Extensions.Logging
                 logLevel,
                 messageWithCategory);
         }
+
+        /// <summary>
+        /// Called by MaCoLoggerExtensions to forward caller info directly.
+        /// Bypasses StackTrace for accurate file/line reporting.
+        /// </summary>
+        internal void LogWithCallerInfo(
+            LogLevel logLevel,
+            string message,
+            string member,
+            string file,
+            int line)
+        {
+            if (!IsEnabled(logLevel))
+                return;
+
+            string messageWithCategory = $"[{_name}] {message}";
+            MaCo.Extensions.Logging.Log.Instance.WriteNew(
+                logLevel,
+                new object[] { messageWithCategory },
+                member,
+                file,
+                line);
+        }
     }
 }
