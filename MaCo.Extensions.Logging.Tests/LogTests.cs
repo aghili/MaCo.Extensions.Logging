@@ -14,9 +14,9 @@ namespace MaCo.Extensions.Logging.Tests
         public void testILoggerBridgeFormatsMessage()
         {
             Log.Instance.Settings.Enabled = true;
-            Log.Instance.Settings.MesssageTypes =
-                LogMesssageType.Exception | LogMesssageType.Warrning |
-                LogMesssageType.Information | LogMesssageType.DataLog;
+            Log.Instance.Settings.MessageTypes =
+                LogMessageType.Exception | LogMessageType.Warning |
+                LogMessageType.Information | LogMessageType.DataLog;
             Log.Instance.writeAdapter.Clear();
             var adapter = new InMemoryAdapter();
             Log.Instance.writeAdapter.Add(adapter);
@@ -34,9 +34,9 @@ namespace MaCo.Extensions.Logging.Tests
         public void Init()
         {
             Log.Instance.Settings.Enabled = true;
-            Log.Instance.Settings.MesssageTypes =
-                LogMesssageType.Exception | LogMesssageType.Warrning |
-                LogMesssageType.Information | LogMesssageType.DataLog;
+            Log.Instance.Settings.MessageTypes =
+                LogMessageType.Exception | LogMessageType.Warning |
+                LogMessageType.Information | LogMessageType.DataLog;
             Log.Instance.writeAdapter.Clear();
             _adapter = new InMemoryAdapter();
             Log.Instance.writeAdapter.Add(_adapter);
@@ -51,10 +51,10 @@ namespace MaCo.Extensions.Logging.Tests
         [TestMethod()]
         public void testLog()
         {
-            Log.Instance.WriteNew(LogMesssageType.Information, "Information log detail.", "detail2", "detail3", "...");
-            Log.Instance.WriteNew(LogMesssageType.Warrning, "Warrning log detail.");
-            Log.Instance.WriteNew(LogMesssageType.DataLog, "DataLog log detail.");
-            Log.Instance.WriteNew(LogMesssageType.Exception, "Exception log detail.");
+            Log.Instance.WriteNew(LogMessageType.Information, "Information log detail.", "detail2", "detail3", "...");
+            Log.Instance.WriteNew(LogMessageType.Warning, "Warning log detail.");
+            Log.Instance.WriteNew(LogMessageType.DataLog, "DataLog log detail.");
+            Log.Instance.WriteNew(LogMessageType.Exception, "Exception log detail.");
 
             try
             {
@@ -98,7 +98,7 @@ namespace MaCo.Extensions.Logging.Tests
         public void testIEnumerableDetailIsJoined()
         {
             var details = new object[] { "alpha", "beta", "gamma" };
-            Log.Instance.WriteNew(LogMesssageType.Information, "prefix", details);
+            Log.Instance.WriteNew(LogMessageType.Information, "prefix", details);
 
             string entry = _adapter.Entries.First(e => e.Contains("prefix"));
             Assert.IsTrue(entry.Contains("prefix=>alpha=>beta=>gamma"));

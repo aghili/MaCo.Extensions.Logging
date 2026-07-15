@@ -6,9 +6,9 @@ public partial class Log
 {
     public class LogSettings
     {
-        [JsonConverter(typeof(JsonStringEnumConverter))] 
-        public LogMesssageType MesssageTypes { set; get; } = LogMesssageType.Exception | LogMesssageType.Warrning;
-        public string Info { set; get; } = "Informations :\nEnable = 'Type = Boolean| set to true for loging program information and exceptions.'\nMesssageTypes = 'Type = Enum(Flags) | Exception=1,Warrning = 2,Information = 4,DataLog = 8'";
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public LogMessageType MessageTypes { set; get; } = LogMessageType.Exception | LogMessageType.Warning;
+        public string Info { set; get; } = "Informations :\nEnable = 'Type = Boolean| set to true for logging program information and exceptions.'\nMessageTypes = 'Type = Enum(Flags) | Exception=1,Warning = 2,Information = 4,DataLog = 8'";
 
         public bool Enabled { get; set; } = true;
 

@@ -28,7 +28,7 @@ internal class LogOnlineAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 
     public IWriterOption WriteOptions { get; set; } = new WriteOptionEvent();
 
-    public event EventHandler<ShirinkEventArgs>? OnShiringRise;
+    public event EventHandler<ShrinkEventArgs>? OnShrinkRise;
 
     public LogOnlineAdapter()
     {
@@ -38,7 +38,7 @@ internal class LogOnlineAdapter : ILogWrite, IDisposable, IEquatable<LogType>
         _uploadTask = Task.Run(UploadLoop);
     }
 
-    public void Write(LogMesssageType type, string path, string message) =>
+    public void Write(LogMessageType type, string path, string message) =>
         Enqueue(MapType(type), message, path);
 
     public void Write(LogLevel type, string path, string message) =>
@@ -57,12 +57,12 @@ internal class LogOnlineAdapter : ILogWrite, IDisposable, IEquatable<LogType>
         });
     }
 
-    private static string MapType(LogMesssageType type) => type switch
+    private static string MapType(LogMessageType type) => type switch
     {
-        LogMesssageType.Exception => "error",
-        LogMesssageType.DataLog => "behavior",
-        LogMesssageType.Warrning => "event",
-        LogMesssageType.Information => "event",
+        LogMessageType.Exception => "error",
+        LogMessageType.DataLog => "behavior",
+        LogMessageType.Warning => "event",
+        LogMessageType.Information => "event",
         _ => "event"
     };
 

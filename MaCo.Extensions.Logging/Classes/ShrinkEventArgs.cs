@@ -1,8 +1,8 @@
 namespace MaCo.Extensions.Logging.Classes;
 
-public class ShirinkEventArgs : EventArgs
+public class ShrinkEventArgs : EventArgs
 {
-    public ShirinkType Type { set; get; } = ShirinkType.Backup;
+    public ShrinkType Type { set; get; } = ShrinkType.Backup;
 
     public int RecordCount { set; get; }
 

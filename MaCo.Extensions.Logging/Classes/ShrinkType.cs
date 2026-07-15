@@ -1,5 +1,5 @@
 namespace MaCo.Extensions.Logging.Classes;
-public enum ShirinkType
+public enum ShrinkType
 {
     Backup,
     Resize

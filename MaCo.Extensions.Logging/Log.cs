@@ -141,9 +141,9 @@ public partial class Log
 
     public LogSettings Settings { set; get; } = new LogSettings();
 
-    public void WriteNew(LogMesssageType type, params object[] msg)
+    public void WriteNew(LogMessageType type, params object[] msg)
     {
-        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(type))
+        if (!Settings.Enabled || !Settings.MessageTypes.HasFlag(type))
             return;
         CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(1));
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
@@ -151,12 +151,12 @@ public partial class Log
         WriteNewCore(type, path, ctx, message);
     }
 
-    public void WriteNew(LogMesssageType type, object[] msg,
+    public void WriteNew(LogMessageType type, object[] msg,
         [CallerMemberName] string member = "",
         [CallerFilePath] string file = "",
         [CallerLineNumber] int line = 0)
     {
-        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(type))
+        if (!Settings.Enabled || !Settings.MessageTypes.HasFlag(type))
             return;
         CallerContext ctx = BuildCallerContext(member, file, line);
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
@@ -166,8 +166,8 @@ public partial class Log
 
     public void WriteNew(LogLevel type, params object[] msg)
     {
-        LogMesssageType mapped = MapLogLevel(type);
-        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(mapped))
+        LogMessageType mapped = MapLogLevel(type);
+        if (!Settings.Enabled || !Settings.MessageTypes.HasFlag(mapped))
             return;
         CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(1));
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
@@ -180,8 +180,8 @@ public partial class Log
         [CallerFilePath] string file = "",
         [CallerLineNumber] int line = 0)
     {
-        LogMesssageType mapped = MapLogLevel(type);
-        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(mapped))
+        LogMessageType mapped = MapLogLevel(type);
+        if (!Settings.Enabled || !Settings.MessageTypes.HasFlag(mapped))
             return;
         CallerContext ctx = BuildCallerContext(member, file, line);
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
@@ -189,7 +189,7 @@ public partial class Log
         WriteNewCore(mapped, path, ctx, message);
     }
 
-    private void WriteNewCore(LogMesssageType type, string path, CallerContext ctx, string message, string extraPath = null)
+    private void WriteNewCore(LogMessageType type, string path, CallerContext ctx, string message, string extraPath = null)
     {
         string headerDate = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}][L:{ctx.LineNumber}]";
         string headerType = $"[{type}]";
@@ -207,11 +207,11 @@ public partial class Log
         }
     }
 
-    private static LogMesssageType MapLogLevel(LogLevel level) => level switch
+    private static LogMessageType MapLogLevel(LogLevel level) => level switch
     {
-        LogLevel.Warning => LogMesssageType.Warrning,
-        LogLevel.Error or LogLevel.Critical => LogMesssageType.Exception,
-        _ => LogMesssageType.Information
+        LogLevel.Warning => LogMessageType.Warning,
+        LogLevel.Error or LogLevel.Critical => LogMessageType.Exception,
+        _ => LogMessageType.Information
     };
 
     public void WriteNew<TState>(
@@ -223,8 +223,8 @@ public partial class Log
     {
         if (!Settings.Enabled)
             return;
-        LogMesssageType mapped = MapLogLevel(level);
-        if (!Settings.MesssageTypes.HasFlag(mapped))
+        LogMessageType mapped = MapLogLevel(level);
+        if (!Settings.MessageTypes.HasFlag(mapped))
             return;
         CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(2));
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
@@ -244,8 +244,8 @@ public partial class Log
     {
         if (!Settings.Enabled)
             return;
-        LogMesssageType mapped = MapLogLevel(level);
-        if (!Settings.MesssageTypes.HasFlag(mapped))
+        LogMessageType mapped = MapLogLevel(level);
+        if (!Settings.MessageTypes.HasFlag(mapped))
             return;
         CallerContext ctx = BuildCallerContext(member, file, line);
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
@@ -257,7 +257,7 @@ public partial class Log
     {
         try
         {
-            writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
+            writeAdapterWrite(LogMessageType.Exception, "LogError.log",
                 $"ErrMgs  = {ex.Message}{Environment.NewLine}" +
                 $"Date    = {headerDate}{Environment.NewLine}" +
                 $"type    = {headerType}{Environment.NewLine}" +
@@ -308,7 +308,7 @@ public partial class Log
         return ctx;
     }
 
-    private void writeAdapterWrite(LogMesssageType messageType, string path, string message)
+    private void writeAdapterWrite(LogMessageType messageType, string path, string message)
     {
         List<ILogWrite>? adapters = null;
         lock (_adapterLock)
@@ -349,8 +349,8 @@ public partial class Log
 
     public void WriteNew(Exception exIn, params object[] msg)
     {
-        LogMesssageType logMesssageType = LogMesssageType.Exception;
-        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(logMesssageType))
+        LogMessageType logMessageType = LogMessageType.Exception;
+        if (!Settings.Enabled || !Settings.MessageTypes.HasFlag(logMessageType))
             return;
         StackFrame? caller = new StackTrace(exIn, true).GetFrame(0);
         string? warning = null;
@@ -363,7 +363,7 @@ public partial class Log
         {
             // Last resort — no stack trace available at all
             string fallbackMessage = $"{exIn}{Environment.NewLine}{BuildMessage(msg, "")}";
-            writeAdapterWrite(logMesssageType, "LogError.log", fallbackMessage);
+            writeAdapterWrite(logMessageType, "LogError.log", fallbackMessage);
             return;
         }
         CallerContext ctx = ResolveCaller(caller);
@@ -373,24 +373,24 @@ public partial class Log
         if (exIn.InnerException != null)
             messageBase += $"{Environment.NewLine} InnerException = {exIn.InnerException}";
         string message = BuildMessage(msg, messageBase);
-        WriteNewCore(logMesssageType, path, ctx, message, pathException);
+        WriteNewCore(logMessageType, path, ctx, message, pathException);
     }
 
-    public void Warrning(params object[] msg)
+    public void Warning(params object[] msg)
     {
-        WriteNew(LogMesssageType.Warrning, msg);
+        WriteNew(LogMessageType.Warning, msg);
     }
     public void Information(params object[] msg)
     {
-        WriteNew(LogMesssageType.Information, msg);
+        WriteNew(LogMessageType.Information, msg);
     }
     public void Exception(params object[] msg)
     {
-        WriteNew(LogMesssageType.Exception, msg);
+        WriteNew(LogMessageType.Exception, msg);
     }
     public void DataLog(params object[] msg)
     {
-        WriteNew(LogMesssageType.DataLog, msg);
+        WriteNew(LogMessageType.DataLog, msg);
     }
     public void Exception(Exception exIn, params object[] msg)
     {

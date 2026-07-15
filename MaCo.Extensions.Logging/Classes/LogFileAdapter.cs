@@ -24,7 +24,7 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
     private readonly AutoResetEvent _writeSignal = new(false);
     private bool disposedValue = false;
 
-    public event EventHandler<ShirinkEventArgs>? OnShiringRise;
+    public event EventHandler<ShrinkEventArgs>? OnShrinkRise;
 
     public IWriterOption WriteOptions { get; set; } = new WriteOption();
 
@@ -104,11 +104,11 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
         {
             string deadFile = file + ".dead";
             File.AppendAllLines(deadFile, logItem.Messages.ToArray());
-            OnShiringRise?.Invoke(this, new ShirinkEventArgs
+            OnShrinkRise?.Invoke(this, new ShrinkEventArgs
             {
                 RecordCount = logItem.Messages.Count,
                 NewRecordCount = 0,
-                Type = ShirinkType.Resize
+                Type = ShrinkType.Resize
             });
             return true;
         }
@@ -176,15 +176,15 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
             // Leave the original file untouched on failure to avoid data loss.
             return;
         }
-        OnShiringRise?.Invoke(this, new ShirinkEventArgs()
+        OnShrinkRise?.Invoke(this, new ShrinkEventArgs()
         {
             RecordCount = recordCount,
             NewRecordCount = 0,
-            Type = ShirinkType.Backup
+            Type = ShrinkType.Backup
         });
     }
 
-    public void Write(LogMesssageType type, string path, string message)
+    public void Write(LogMessageType type, string path, string message)
     {
         path = Path.Combine(ExecPath, "Log", path);
         AddEntity(path, message);

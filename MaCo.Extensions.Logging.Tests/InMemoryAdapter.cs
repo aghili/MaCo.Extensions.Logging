@@ -14,9 +14,9 @@ internal class InMemoryAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 
     public LogType WriterType { get; set; } = LogType.File;
 
-    public event EventHandler<ShirinkEventArgs>? OnShiringRise;
+    public event EventHandler<ShrinkEventArgs>? OnShrinkRise;
 
-    public void Write(LogMesssageType type, string path, string message) =>
+    public void Write(LogMessageType type, string path, string message) =>
         Entries.Add($"{type}|{path}|{message}");
 
     public void Write(LogLevel type, string path, string message) =>

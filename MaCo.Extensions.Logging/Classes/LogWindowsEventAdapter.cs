@@ -11,9 +11,9 @@ internal class LogWindowsEventAdapter : ILogWrite, IDisposable, IEquatable<LogTy
 
     public IWriterOption WriteOptions { get; set; } = new WriteOptionEvent();
 
-    public event EventHandler<ShirinkEventArgs> OnShiringRise;
+    public event EventHandler<ShrinkEventArgs>? OnShrinkRise;
 
-    public void Write(LogMesssageType type, string path, string message)
+    public void Write(LogMessageType type, string path, string message)
     {
     }
 
