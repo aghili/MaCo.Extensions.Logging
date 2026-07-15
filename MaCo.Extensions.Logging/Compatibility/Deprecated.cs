@@ -1,71 +1,128 @@
 using System.ComponentModel;
 using MaCo.Extensions.Logging.Classes;
 
-namespace MaCo.Extensions.Logging;
+// =============================================================================
+// DEPRECATED COMPATIBILITY LAYER
+// These types preserve the original Aghili.Logging namespace API surface.
+// They will be removed in v2.0. Migrate to MaCo.Extensions.Logging.
+// =============================================================================
 
-/// <summary>
-/// Deprecated. Use <see cref="LogMessageType"/> instead.
-/// This type will be removed in v2.0.
-/// </summary>
-[Obsolete("Use LogMessageType instead. This type will be removed in v2.0.")]
-[EditorBrowsable(EditorBrowsableState.Never)]
-public enum LogMesssageType
+namespace Aghili.Logging
 {
-    Exception = 1,
-    Warrning = 2,
-    Information = 4,
-    DataLog = 8,
+    /// <summary>
+    /// Deprecated. Use <see cref="MaCo.Extensions.Logging.LogMessageType"/> instead.
+    /// Original namespace: Aghili.Logging
+    /// </summary>
+    [Obsolete("Use MaCo.Extensions.Logging.LogMessageType instead. This type will be removed in v2.0.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [Flags]
+    public enum LogMesssageType
+    {
+        Exception = 1,
+        Warrning = 2,
+        Information = 4,
+        DataLog = 8,
+    }
+
+    /// <summary>
+    /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log"/> instead.
+    /// Original namespace: Aghili.Logging
+    /// </summary>
+    [Obsolete("Use MaCo.Extensions.Logging.Log instead. This type will be removed in v2.0.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static class Log
+    {
+        /// <summary>
+        /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log.Instance"/> instead.
+        /// </summary>
+        [Obsolete("Use MaCo.Extensions.Logging.Log.Instance instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static MaCo.Extensions.Logging.Log Instance => MaCo.Extensions.Logging.Log.Instance;
+
+        /// <summary>
+        /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log.Dispose"/> instead.
+        /// </summary>
+        [Obsolete("Use MaCo.Extensions.Logging.Log.Dispose() instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static void Dispose() => MaCo.Extensions.Logging.Log.Dispose();
+
+        /// <summary>
+        /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log.Configure"/> instead.
+        /// </summary>
+        [Obsolete("Use MaCo.Extensions.Logging.Log.Configure() instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static void Configure(Microsoft.Extensions.Configuration.IConfiguration configuration, string sectionName = "Logging:MaCo")
+            => MaCo.Extensions.Logging.Log.Configure(configuration, sectionName);
+
+        /// <summary>
+        /// Deprecated. Use the new API with LogMessageType instead.
+        /// </summary>
+        [Obsolete("Use MaCo.Extensions.Logging.Log.Instance.Warning() instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static void Warrning(this MaCo.Extensions.Logging.Log log, params object[] msg)
+            => log.Warning(msg);
+    }
+
+    /// <summary>
+    /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log.LogSettings"/> instead.
+    /// Original namespace: Aghili.Logging
+    /// </summary>
+    [Obsolete("Use MaCo.Extensions.Logging.Log.LogSettings instead. This type will be removed in v2.0.")]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static class LogSettingsExtensions
+    {
+        /// <summary>
+        /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log.LogSettings.MessageTypes"/> instead.
+        /// </summary>
+        [Obsolete("Use Settings.MessageTypes instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static LogMesssageType GetMesssageTypes(this MaCo.Extensions.Logging.Log.LogSettings settings)
+            => (LogMesssageType)(int)settings.MessageTypes;
+
+        /// <summary>
+        /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Log.LogSettings.MessageTypes"/> instead.
+        /// </summary>
+        [Obsolete("Use Settings.MessageTypes instead.")]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static void SetMesssageTypes(this MaCo.Extensions.Logging.Log.LogSettings settings, LogMesssageType value)
+            => settings.MessageTypes = (MaCo.Extensions.Logging.LogMessageType)(int)value;
+    }
 }
 
-/// <summary>
-/// Deprecated. Use <see cref="ShrinkEventArgs"/> instead.
-/// This type will be removed in v2.0.
-/// </summary>
-[Obsolete("Use ShrinkEventArgs instead. This type will be removed in v2.0.")]
-[EditorBrowsable(EditorBrowsableState.Never)]
-public class ShirinkEventArgs : ShrinkEventArgs { }
-
-/// <summary>
-/// Deprecated. Use <see cref="ShrinkType"/> instead.
-/// This type will be removed in v2.0.
-/// </summary>
-[Obsolete("Use ShrinkType instead. This type will be removed in v2.0.")]
-[EditorBrowsable(EditorBrowsableState.Never)]
-public enum ShirinkType
-{
-    Backup = 0,
-    Resize = 1,
-}
-
-/// <summary>
-/// Extension methods providing backward-compatible deprecated API surface.
-/// These will be removed in v2.0.
-/// </summary>
-[Obsolete("This compatibility layer will be removed in v2.0. Migrate to the new API.")]
-[EditorBrowsable(EditorBrowsableState.Never)]
-public static class DeprecatedExtensions
+namespace Aghili.Logging.Classes
 {
     /// <summary>
-    /// Deprecated. Use <see cref="Log.Warning(object[])"/> instead.
+    /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Classes.ShrinkEventArgs"/> instead.
+    /// Original namespace: Aghili.Logging.Classes
     /// </summary>
-    [Obsolete("Use Log.Warning() instead. This method will be removed in v2.0.")]
+    [Obsolete("Use MaCo.Extensions.Logging.Classes.ShrinkEventArgs instead. This type will be removed in v2.0.")]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Warrning(this Log log, params object[] msg)
-        => log.Warning(msg);
+    public class ShirinkEventArgs : MaCo.Extensions.Logging.Classes.ShrinkEventArgs { }
 
     /// <summary>
-    /// Deprecated. Use <see cref="Log.MessageTypes"/> instead.
+    /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Classes.ShrinkType"/> instead.
+    /// Original namespace: Aghili.Logging.Classes
     /// </summary>
-    [Obsolete("Use Settings.MessageTypes instead. This property will be removed in v2.0.")]
+    [Obsolete("Use MaCo.Extensions.Logging.Classes.ShrinkType instead. This type will be removed in v2.0.")]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static LogMesssageType GetMesssageTypes(this Log.LogSettings settings)
-        => (LogMesssageType)(int)settings.MessageTypes;
+    public enum ShirinkType
+    {
+        Backup = 0,
+        Resize = 1,
+    }
 
     /// <summary>
-    /// Deprecated. Use <see cref="Log.MessageTypes"/> instead.
+    /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Classes.ILogWrite"/> instead.
+    /// Original namespace: Aghili.Logging.Classes
     /// </summary>
-    [Obsolete("Use Settings.MessageTypes instead. This property will be removed in v2.0.")]
+    [Obsolete("Use MaCo.Extensions.Logging.Classes.ILogWrite instead. This interface will be removed in v2.0.")]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void SetMesssageTypes(this Log.LogSettings settings, LogMesssageType value)
-        => settings.MessageTypes = (LogMessageType)(int)value;
+    public interface ILogWrite : MaCo.Extensions.Logging.Classes.ILogWrite
+    {
+        /// <summary>
+        /// Deprecated. Use <see cref="MaCo.Extensions.Logging.Classes.ILogWrite.OnShrinkRise"/> instead.
+        /// </summary>
+        [Obsolete("Use OnShrinkRise instead.")]
+        new event EventHandler<ShirinkEventArgs>? OnShiringRise;
+    }
 }

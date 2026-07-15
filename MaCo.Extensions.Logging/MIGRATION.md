@@ -124,15 +124,26 @@ Log.Instance.WriteNew(LogLevel.Information, "message");
 
 ## Backward Compatibility
 
-Deprecated types and methods are available in the `MaCo.Extensions.Logging.Compatibility` namespace:
+Deprecated types are available in the original `Aghili.Logging` and `Aghili.Logging.Classes` namespaces:
 
 ```csharp
-using MaCo.Extensions.Logging.Compatibility;
+// Old namespace still works but shows deprecation warnings
+using Aghili.Logging;
+using Aghili.Logging.Classes;
 
-// Old API still works but shows deprecation warnings
 LogMesssageType type = LogMesssageType.Warrning;
 adapter.OnShiringRise += (s, e) => { ... };
 ```
+
+### Available Deprecated Types
+
+| Old Type | New Type | Namespace |
+|----------|----------|-----------|
+| `Aghili.Logging.LogMesssageType` | `MaCo.Extensions.Logging.LogMessageType` | `Aghili.Logging` |
+| `Aghili.Logging.Log` | `MaCo.Extensions.Logging.Log` | `Aghili.Logging` |
+| `Aghili.Logging.Classes.ShirinkEventArgs` | `MaCo.Extensions.Logging.Classes.ShrinkEventArgs` | `Aghili.Logging.Classes` |
+| `Aghili.Logging.Classes.ShirinkType` | `MaCo.Extensions.Logging.Classes.ShrinkType` | `Aghili.Logging.Classes` |
+| `Aghili.Logging.Classes.ILogWrite.OnShiringRise` | `MaCo.Extensions.Logging.Classes.ILogWrite.OnShrinkRise` | `Aghili.Logging.Classes` |
 
 **Note:** These compatibility shims will be removed in v2.0.
 
