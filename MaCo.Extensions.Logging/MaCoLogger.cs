@@ -1,4 +1,3 @@
-﻿using Aghili.Logging;
 using Microsoft.Extensions.Logging;
 
 namespace MaCo.Extensions.Logging
@@ -25,7 +24,7 @@ namespace MaCo.Extensions.Logging
             }
 
             MaCoLoggerConfiguration config = getCurrentConfig();
-            Aghili.Logging.Log.Instance.WriteNew(
+            MaCo.Extensions.Logging.Log.Instance.WriteNew(
                 logLevel,
                 eventId,
                 state,

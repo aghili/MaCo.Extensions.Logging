@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -6,12 +6,14 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
 
 
-namespace Aghili.Logging.Classes;
+namespace MaCo.Extensions.Logging.Classes;
 
 public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 {
@@ -19,6 +21,7 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
     public object objectLock = new object();
     private readonly ConcurrentDictionary<string, LogEntity> LogEntites = new ConcurrentDictionary<string, LogEntity>();
     private Thread? LogWriter = null;
+    private readonly AutoResetEvent _writeSignal = new(false);
     private bool disposedValue = false;
 
     public event EventHandler<ShirinkEventArgs>? OnShiringRise;
@@ -79,162 +82,145 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
         {
             if (LogWriter != null && LogWriter.IsAlive)
                 return;
-            LogWriter = null;
-            Thread thread = new((() =>
-            {
-                int num = 2;
-                while (num-- >= 0)
-                {
-                    try
-                    {
-                        if (LogEntites == null || LogEntites.IsEmpty)
-                        {
-                            Thread.Sleep(1000);
-                        }
-                        else
-                        {
-                            num = 2;
-                            int max = LogEntites.Max(i => i.Value.Messages.Count);
-                            foreach (KeyValuePair<string, LogEntity> keyValuePair in LogEntites.Where(i => i.Value.Messages.Count >= max).ToList<KeyValuePair<string, LogEntity>>())
-                            {
-                                string key = keyValuePair.Key;
-                                LogEntity logItem = keyValuePair.Value;
-                                if (logItem.WriteTriedNumber <= 100 && WriteLogEntity(key, logItem))
-                                {
-                                    while (!LogEntites.TryRemove(keyValuePair.Key, out var _))
-                                        Thread.Sleep(100);
-                                }
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        if (LogEntites != null && !LogEntites.IsEmpty)
-                        {
-                            if ((LogWriter != null ? (LogWriter.IsAlive ? 1 : 0) : 0) == 0)
-                            {
-                                if (LogEntites != null)
-                                {
-                                    lock (LogEntites)
-                                    {
-                                        foreach (KeyValuePair<string, LogEntity> logEntite in LogEntites)
-                                            WriteLogEntity(logEntite.Key, logEntite.Value);
-                                    }
-                                }
-                            }
-                            else
-                                Thread.Sleep(3000);
-                        }
-                    }
-                }
-            }))
+            LogWriter = new Thread(WriterLoop)
             {
                 Name = $"LogWriter {DateTime.Now}"
             };
-            LogWriter = thread;
             LogWriter.Start();
+        }
+    }
+
+    private const int MaxRetries = 100;
+
+    private void WriterLoop()
+    {
+        while (!Terminated)
+        {
+            try
+            {
+                _writeSignal.WaitOne(TimeSpan.FromSeconds(1));
+            }
+            catch (ObjectDisposedException)
+            {
+                break;
+            }
+            if (Terminated)
+                break;
+            try
+            {
+                ProcessEntities();
+            }
+            catch
+            {
+                // Swallow and retry on the next cycle; entities remain queued.
+            }
+        }
+        // Final drain so pending entries are not lost on shutdown.
+        try { ProcessEntities(); } catch { }
+    }
+
+    private void ProcessEntities()
+    {
+        if (LogEntites.IsEmpty)
+            return;
+        foreach (KeyValuePair<string, LogEntity> keyValuePair in LogEntites.ToList())
+        {
+            LogEntity entity = keyValuePair.Value;
+            if (entity.WriteTriedNumber > MaxRetries)
+            {
+                // Give up on the primary file but keep the data on disk (dead-letter).
+                if (DeadLetter(keyValuePair.Key, entity))
+                    while (!LogEntites.TryRemove(keyValuePair.Key, out _))
+                        Thread.Sleep(0);
+                continue;
+            }
+            if (WriteLogEntity(keyValuePair.Key, entity))
+                while (!LogEntites.TryRemove(keyValuePair.Key, out _))
+                    Thread.Sleep(0);
+        }
+    }
+
+    private bool DeadLetter(string file, LogEntity logItem)
+    {
+        try
+        {
+            string deadFile = file + ".dead";
+            File.AppendAllLines(deadFile, logItem.Messages.ToArray());
+            OnShiringRise?.Invoke(this, new ShirinkEventArgs
+            {
+                RecordCount = logItem.Messages.Count,
+                NewRecordCount = 0,
+                Type = ShirinkType.Resize
+            });
+            return true;
+        }
+        catch
+        {
+            // Keep the entity queued so it is retried on the next cycle.
+            return false;
         }
     }
 
     private void AddEntity(string File, string Message)
     {
-        if (!LogEntites.ContainsKey(File))
-        {
-            while (!LogEntites.TryAdd(File, new LogEntity()))
-                Thread.Sleep(100);
-        }
-        LogEntites[File].Messages.Enqueue(Message);
+        var entity = LogEntites.GetOrAdd(File, _ => new LogEntity());
+        entity.Messages.Enqueue(Message);
         HintOnWriterEngine();
-    }
-
-    protected static void CreateAndSetPermissions(string path)
-    {
-        try
-        {
-            FileInfo fileInfo = new(path);
-            if (fileInfo.Directory == null)
-            {
-                Directory.CreateDirectory(path);
-                fileInfo = new FileInfo(path);
-            }
-            else if (!fileInfo.Directory.Exists)
-                fileInfo.Directory.Create();
-            if (fileInfo.Directory == null || !fileInfo.Exists)
-                return;
-#if !NETSTANDARD
-            FileSystemAccessRule rule1 = new(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.NoPropagateInherit, AccessControlType.Allow);
-            DirectorySecurity accessControl1 = fileInfo.Directory.GetAccessControl();
-            accessControl1.AddAccessRule(rule1);
-            fileInfo.Directory.SetAccessControl(accessControl1);
-            FileSystemAccessRule rule2 = new(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.FullControl, InheritanceFlags.None, PropagationFlags.NoPropagateInherit, AccessControlType.Allow);
-            FileSecurity accessControl2 = fileInfo.GetAccessControl();
-            accessControl2.AddAccessRule(rule2);
-            fileInfo.SetAccessControl(accessControl2);
-#endif
-        }
-        catch (Exception ex)
-        {
-            Log.Instance.WriteNew(ex);
-        }
+        _writeSignal.Set();
     }
 
     private bool WriteLogEntity(string file, LogEntity logItem)
     {
-        ++logItem.WriteTriedNumber;
         try
         {
-            LogFileAdapter.CreateAndSetPermissions(file);
-            FileStream fileStream = new(file, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-            if (fileStream.Length > WriteOptions.LogRowLimitPerContainer * 1024)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                PermissionsHelper.EnsurePermissions(file);
+
+            FileStream? fileStream = null;
+            try
             {
-                fileStream.Close();
-                Backup(file);
                 fileStream = new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                if (fileStream.Length > WriteOptions.LogRowLimitPerContainer * 1024)
+                {
+                    fileStream.Dispose();
+                    Backup(file, logItem.Messages.Count);
+                    fileStream = new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                }
+                using var writer = new StreamWriter(fileStream);
+                foreach (string message in logItem.Messages)
+                    writer.WriteLine(message);
+                writer.Flush();
             }
-            StreamWriter streamWriter = new(fileStream);
-            foreach (string message in logItem.Messages)
-                streamWriter.WriteLine(message);
-            streamWriter.Flush();
-            streamWriter.Close();
+            finally
+            {
+                fileStream?.Dispose();
+            }
             return true;
         }
         catch
         {
+            logItem.IncrementWriteTriedNumber();
             return false;
         }
     }
 
-    private void Backup(string file_name)
+    private void Backup(string file_name, int recordCount)
     {
-        if (File.Exists(file_name + ".bak"))
-        {
-            try
-            {
-                File.Delete(file_name + ".bak");
-            }
-            catch
-            {
-            }
-        }
+        string backupName = file_name + ".bak";
         try
         {
-            File.Move(file_name, file_name + ".bak");
+            if (File.Exists(backupName))
+                File.Delete(backupName);
+            File.Move(file_name, backupName);
         }
         catch
         {
-            try
-            {
-                File.Delete(file_name);
-            }
-            catch
-            {
-            }
-        }
-        if (OnShiringRise == null)
+            // Leave the original file untouched on failure to avoid data loss.
             return;
-        OnShiringRise(this, new ShirinkEventArgs()
+        }
+        OnShiringRise?.Invoke(this, new ShirinkEventArgs()
         {
-            RecordCount = 0,
+            RecordCount = recordCount,
             NewRecordCount = 0,
             Type = ShirinkType.Backup
         });
@@ -242,7 +228,7 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 
     public void Write(LogMesssageType type, string path, string message)
     {
-        path = ExecPath + "\\Log\\" + path;
+        path = Path.Combine(ExecPath, "Log", path);
         AddEntity(path, message);
     }
 
@@ -255,7 +241,10 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
             try
             {
                 Terminated = true;
+                _writeSignal.Set();
                 LogWriter?.Join(10000);
+                // Final drain — ensure all pending entities are written to disk.
+                try { ProcessEntities(); } catch { }
             }
             catch
             {
@@ -270,11 +259,19 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
         GC.SuppressFinalize(this);
     }
 
+    public void Flush()
+    {
+        _writeSignal.Set();
+        while (!LogEntites.IsEmpty)
+            Thread.Sleep(10);
+        LogWriter?.Join(1000);
+    }
+
     public bool Equals(LogType other) => WriterType == other;
 
     public void Write(LogLevel type, string path, string message)
     {
-        path = ExecPath + "\\Log\\" + path;
+        path = Path.Combine(ExecPath, "Log", path);
         AddEntity(path, message);
     }
 }

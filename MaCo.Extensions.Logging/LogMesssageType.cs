@@ -1,4 +1,4 @@
-﻿namespace Aghili.Logging;
+namespace MaCo.Extensions.Logging;
 
 [Flags]
 public enum LogMesssageType

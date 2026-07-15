@@ -361,3 +361,17 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local logging fallback directory (Prevent agent from scanning local logs)
+*.log
+/LocalLogBuffer/
+
+# MiMo Code Agent configuration
+.mimocode/
+
+# OpenCode configuration
+.opencode/
+
+# AI agent configuration files (generated, not source)
+mimo.json
+opencode.json

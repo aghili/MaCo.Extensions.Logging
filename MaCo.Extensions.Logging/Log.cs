@@ -1,19 +1,21 @@
-﻿using Aghili.Logging.Classes;
+using MaCo.Extensions.Logging.Classes;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Security;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using System.Text.Json;
 
 
-namespace Aghili.Logging;
+namespace MaCo.Extensions.Logging;
 
 public partial class Log
 {
     private static Log LogInstance = new();
     public List<ILogWrite> writeAdapter = [];
+    private readonly object _adapterLock = new();
     private string ExecPath;
 
     private Log()
@@ -23,31 +25,11 @@ public partial class Log
         CreateLogAdapter();
     }
 
-    protected static void CreateAndSetPermissions(string path)
-    {
-        try
-        {
-            FileInfo fileInfo = new FileInfo(path);
-            if (!fileInfo.Directory.Exists)
-                fileInfo.Directory.Create();
-#if !NETSTANDARD            
-            FileSystemAccessRule rule1 = new FileSystemAccessRule((IdentityReference)new SecurityIdentifier(WellKnownSidType.WorldSid, (SecurityIdentifier)null), FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.NoPropagateInherit, AccessControlType.Allow);
-            DirectorySecurity accessControl1 = fileInfo.Directory.GetAccessControl();
-            accessControl1.AddAccessRule(rule1);
-            fileInfo.Directory.SetAccessControl(accessControl1);
-            if (!fileInfo.Exists)
-                return;
-            FileSystemAccessRule rule2 = new FileSystemAccessRule((IdentityReference)new SecurityIdentifier(WellKnownSidType.WorldSid, (SecurityIdentifier)null), FileSystemRights.FullControl, InheritanceFlags.None, PropagationFlags.NoPropagateInherit, AccessControlType.Allow);
-            FileSecurity accessControl2 = fileInfo.GetAccessControl();
-            accessControl2.AddAccessRule(rule2);
-            fileInfo.SetAccessControl(accessControl2);
+#if !NETSTANDARD
+    [SupportedOSPlatform("windows")]
 #endif
-        }
-        catch (Exception ex)
-        {
-            Log.Instance.WriteNew(ex);
-        }
-    }
+    protected static void CreateAndSetPermissions(string path) =>
+        PermissionsHelper.EnsurePermissions(path);
 
     private void CreateLogAdapter()
     {
@@ -67,6 +49,8 @@ public partial class Log
         }
         if (Settings.LogType.HasFlag(LogType.File) && !flag)
             writeAdapter.Add(new LogFileAdapter());
+        if (Settings.LogType.HasFlag(LogType.Online) && Settings.Online.Enabled)
+            writeAdapter.Add(new LogOnlineAdapter());
         foreach (ILogWrite logWrite in writeAdapter)
         {
             logWrite.WriteOptions.LogKeepDataOnLimitRichedPercent = Settings.LogKeepDataOnLimitRichedPercent;
@@ -76,44 +60,7 @@ public partial class Log
 
     private void InitialVariables()
     {
-        string? GetExecutingAssemblyLocation = null;
-        try
-        {
-            GetExecutingAssemblyLocation = Assembly.GetExecutingAssembly().Location;
-            GetExecutingAssemblyLocation = string.IsNullOrEmpty(GetExecutingAssemblyLocation) ? null : Path.GetDirectoryName(GetExecutingAssemblyLocation);
-        }
-        catch
-        {
-        }
-        string? AppContextBaseDirectory = null;
-        try
-        {
-            AppContextBaseDirectory = AppContext.BaseDirectory;
-            AppContextBaseDirectory = string.IsNullOrEmpty(AppContextBaseDirectory) ? null : AppContextBaseDirectory;
-        }
-        catch
-        {
-        }
-        string? EnvironmentCurrentDirectory = null;
-        try
-        {
-            EnvironmentCurrentDirectory = Environment.CurrentDirectory;
-            EnvironmentCurrentDirectory = string.IsNullOrEmpty(EnvironmentCurrentDirectory) ? null : EnvironmentCurrentDirectory;
-        }
-        catch
-        {
-        }
-        string? TempFolder = null;
-        try
-        {
-            TempFolder = Path.GetTempPath();
-            TempFolder = string.IsNullOrEmpty(TempFolder) ? null : TempFolder;
-        }
-        catch
-        {
-        }
-
-        ExecPath = AppContextBaseDirectory ?? GetExecutingAssemblyLocation ?? TempFolder ?? EnvironmentCurrentDirectory ?? "";
+        ExecPath = PathHelper.ResolveExecPath();
     }
 
     private void LoadSettings()
@@ -126,8 +73,8 @@ public partial class Log
         {
             try
             {
-                Directory.CreateDirectory(ExecPath + "\\Log");
-                File.WriteAllText(ExecPath + "\\Log\\Settings.json", JsonSerializer.Serialize(Settings));
+                Directory.CreateDirectory(Path.Combine(ExecPath, "Log"));
+                File.WriteAllText(Path.Combine(ExecPath, "Log", "Settings.json"), JsonSerializer.Serialize(Settings));
             }
             catch
             {
@@ -135,10 +82,11 @@ public partial class Log
         }
     }
 
-    public string ReadSettingContent()
+    private string ReadSettingContent()
     {
-        CreateAndSetPermissions(ExecPath + "\\Log\\Settings.json");
-        return File.ReadAllText(ExecPath + "\\Log\\Settings.json");
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                CreateAndSetPermissions(Path.Combine(ExecPath, "Log", "Settings.json"));
+        return File.ReadAllText(Path.Combine(ExecPath, "Log", "Settings.json"));
     }
 
     public static Log Instance
@@ -152,12 +100,40 @@ public partial class Log
 
     public static void Dispose()
     {
-        if (Log.LogInstance?.writeAdapter != null)
+        Log? instance;
+        lock (Instance._adapterLock)
         {
-            foreach (ILogWrite logWrite in LogInstance?.writeAdapter)
+            instance = LogInstance;
+            LogInstance = null;
+        }
+        if (instance?.writeAdapter != null)
+        {
+            foreach (ILogWrite logWrite in instance.writeAdapter)
                 logWrite?.Dispose();
         }
-        LogInstance = null;
+    }
+
+    public static void Configure(IConfiguration configuration, string sectionName = "Logging:MaCo")
+    {
+        if (configuration == null)
+            throw new ArgumentNullException(nameof(configuration));
+        IConfigurationSection section = configuration.GetSection(sectionName);
+        if (section.Exists())
+        {
+            section.Bind(Instance.Settings);
+            Instance.RebuildAdapters();
+        }
+    }
+
+    private void RebuildAdapters()
+    {
+        lock (_adapterLock)
+        {
+            foreach (ILogWrite logWrite in writeAdapter)
+                logWrite?.Dispose();
+            writeAdapter.Clear();
+            CreateLogAdapter();
+        }
     }
 
     ~Log() => Dispose();
@@ -168,296 +144,175 @@ public partial class Log
     {
         if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(type))
             return;
-        try
-        {
-            StackFrame caller = new StackTrace().GetFrame(1);
-            bool CallerIsValid = caller != null;
-            string ClassFullName = string.Empty;
-            string MethodName = string.Empty;
-            string FileThatContainMethod = "Unknown";
-            string ClassName = string.Empty;
-            int LineNumber = 0;
-            if (CallerIsValid)
-            {
-                MethodBase method = caller.GetMethod();
-                LineNumber = caller.GetFileLineNumber();
-                if (method != null)
-                {
-                    ClassFullName = Utilites.RemoveIligalPathChars(method.DeclaringType?.FullName);
-                    MethodName = Utilites.RemoveIligalPathChars(method.Name);
-                    FileThatContainMethod = Utilites.RemoveIligalPathChars(method.Module?.ToString());
-                    ClassName = Utilites.RemoveIligalPathChars(method.DeclaringType?.Name);
-                }
-            }
-            string path = Path.Combine(FileThatContainMethod, ClassFullName, MethodName);
-            string message = "";
-            foreach (var item in msg)
-            {
-                if (item != null)
-                {
-                    if (typeof(IEnumerable<object>).IsAssignableFrom(item.GetType()))
-                    {
-                        foreach (object message_node in (object[])item)
-                            message = message_node.ToString() + "=>";
-                    }
-                    else
-                        message = message + item.ToString() + "=>";
-                }
-            }
-
-            string HeaderDate = $"[{DateTime.Now:yyyy-MM-dd hh:mm:ss}][L:{LineNumber}]";
-            string HeaderType = $"[{type}]";
-
-            try
-            {
-                writeAdapterWrite(type, Path.Combine(path, $"{type}.log"), HeaderDate + message);
-                writeAdapterWrite(type, Path.Combine(path, "AllMessages.log"), HeaderDate + HeaderType + message);
-                writeAdapterWrite(type, "AllMessages.log", $"{HeaderDate}{HeaderType}{FileThatContainMethod}\\{ClassName}-{message}");
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
-                        $"ErrMgs  = {ex.Message}{Environment.NewLine}" +
-                        $"Date    = {HeaderDate}{Environment.NewLine}" +
-                        $"type    = {HeaderType}{Environment.NewLine}" +
-                        $"path    = {path}{Environment.NewLine}" +
-                        $"message = {message}{Environment.NewLine}" +
-                        $"module  = {FileThatContainMethod}{Environment.NewLine}" +
-                        $"DeclaringType.Name= {ClassName}{Environment.NewLine}" +
-                        $"StackTrace = {ex.StackTrace}{Environment.NewLine}" +
-                        $"----------------------------------------------------------------------------{Environment.NewLine}");
-                }
-                catch
-                {
-                }
-            }
-            finally
-            {
-            }
-        }
-        catch (StackOverflowException ex)
-        {
-        }
-        catch (Exception ex)
-        {
-            try
-            {
-                writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
-                    $"Date      = {DateTime.Now:yyyy-MM-dd hh:mm:ss}+{Environment.NewLine}" +
-                    $"Message   = {ex}{Environment.NewLine}" +
-                    $"----------------------------------------------------------------------{Environment.NewLine}");
-            }
-            catch
-            {
-            }
-        }
+        CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(1));
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string message = BuildMessage(msg);
+        WriteNewCore(type, path, ctx, message);
     }
 
     public void WriteNew(LogLevel type, params object[] msg)
     {
-        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(type))
+        LogMesssageType mapped = MapLogLevel(type);
+        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(mapped))
             return;
+        CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(1));
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string message = BuildMessage(msg);
+        WriteNewCore(mapped, path, ctx, message);
+    }
+
+    private void WriteNewCore(LogMesssageType type, string path, CallerContext ctx, string message, string extraPath = null)
+    {
+        string headerDate = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}][L:{ctx.LineNumber}]";
+        string headerType = $"[{type}]";
         try
         {
-            StackFrame caller = new StackTrace().GetFrame(1);
-            bool CallerIsValid = caller != null;
-            string ClassFullName = string.Empty;
-            string MethodName = string.Empty;
-            string FileThatContainMethod = "Unknown";
-            string ClassName = string.Empty;
-            int LineNumber = 0;
-            if (CallerIsValid)
-            {
-                MethodBase method = caller.GetMethod();
-                LineNumber = caller.GetFileLineNumber();
-                if (method != null)
-                {
-                    ClassFullName = Utilites.RemoveIligalPathChars(method.DeclaringType?.FullName);
-                    MethodName = Utilites.RemoveIligalPathChars(method.Name);
-                    FileThatContainMethod = Utilites.RemoveIligalPathChars(method.Module?.ToString());
-                    ClassName = Utilites.RemoveIligalPathChars(method.DeclaringType?.Name);
-                }
-            }
-            string path = Path.Combine(FileThatContainMethod, ClassFullName, MethodName);
-            string message = "";
-            foreach (var item in msg)
-            {
-                if (item != null)
-                {
-                    if (typeof(IEnumerable<object>).IsAssignableFrom(item.GetType()))
-                    {
-                        foreach (object message_node in (object[])item)
-                            message = message_node.ToString() + "=>";
-                    }
-                    else
-                        message = message + item.ToString() + "=>";
-                }
-            }
-
-            string HeaderDate = $"[{DateTime.Now:yyyy-MM-dd hh:mm:ss}][L:{LineNumber}]";
-            string HeaderType = $"[{type}]";
-
-            try
-            {
-                writeAdapterWrite(type, Path.Combine(path, $"{type}.log"), HeaderDate + message);
-                writeAdapterWrite(type, Path.Combine(path, "AllMessages.log"), HeaderDate + HeaderType + message);
-                writeAdapterWrite(type, "AllMessages.log", $"{HeaderDate}{HeaderType}{FileThatContainMethod}\\{ClassName}-{message}");
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
-                        $"ErrMgs  = {ex.Message}{Environment.NewLine}" +
-                        $"Date    = {HeaderDate}{Environment.NewLine}" +
-                        $"type    = {HeaderType}{Environment.NewLine}" +
-                        $"path    = {path}{Environment.NewLine}" +
-                        $"message = {message}{Environment.NewLine}" +
-                        $"module  = {FileThatContainMethod}{Environment.NewLine}" +
-                        $"DeclaringType.Name= {ClassName}{Environment.NewLine}" +
-                        $"StackTrace = {ex.StackTrace}{Environment.NewLine}" +
-                        $"----------------------------------------------------------------------------{Environment.NewLine}");
-                }
-                catch
-                {
-                }
-            }
-            finally
-            {
-            }
-        }
-        catch (StackOverflowException ex)
-        {
+            writeAdapterWrite(type, Path.Combine(path, $"{type}.log"), headerDate + message);
+            writeAdapterWrite(type, Path.Combine(path, "AllMessages.log"), headerDate + headerType + message);
+            writeAdapterWrite(type, "AllMessages.log", $"{headerDate}{headerType}{ctx.FileThatContainMethod}\\{ctx.ClassName}-{message}");
+            if (extraPath != null)
+                writeAdapterWrite(type, Path.Combine(extraPath, $"{type}.log"), headerDate + message);
         }
         catch (Exception ex)
         {
-            try
-            {
-                writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
-                    $"Date      = {DateTime.Now:yyyy-MM-dd hh:mm:ss}+{Environment.NewLine}" +
-                    $"Message   = {ex}{Environment.NewLine}" +
-                    $"----------------------------------------------------------------------{Environment.NewLine}");
-            }
-            catch
-            {
-            }
+            WriteErrorLog(headerDate, headerType, path, message, ctx, ex);
         }
+    }
+
+    private static LogMesssageType MapLogLevel(LogLevel level) => level switch
+    {
+        LogLevel.Warning => LogMesssageType.Warrning,
+        LogLevel.Error or LogLevel.Critical => LogMesssageType.Exception,
+        _ => LogMesssageType.Information
+    };
+
+    public void WriteNew<TState>(
+        LogLevel level,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter)
+    {
+        if (!Settings.Enabled)
+            return;
+        LogMesssageType mapped = MapLogLevel(level);
+        if (!Settings.MesssageTypes.HasFlag(mapped))
+            return;
+        CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(2));
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string message = formatter(state, exception);
+        WriteNewCore(mapped, path, ctx, message);
+    }
+
+    private void WriteErrorLog(string headerDate, string headerType, string path, string message, CallerContext ctx, Exception ex)
+    {
+        try
+        {
+            writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
+                $"ErrMgs  = {ex.Message}{Environment.NewLine}" +
+                $"Date    = {headerDate}{Environment.NewLine}" +
+                $"type    = {headerType}{Environment.NewLine}" +
+                $"path    = {path}{Environment.NewLine}" +
+                $"message = {message}{Environment.NewLine}" +
+                $"module  = {ctx.FileThatContainMethod}{Environment.NewLine}" +
+                $"DeclaringType.Name= {ctx.ClassName}{Environment.NewLine}" +
+                $"StackTrace = {ex.StackTrace}{Environment.NewLine}" +
+                $"----------------------------------------------------------------------------{Environment.NewLine}");
+        }
+        catch
+        {
+        }
+    }
+
+    private struct CallerContext
+    {
+        public string ClassFullName;
+        public string MethodName;
+        public string FileThatContainMethod;
+        public string ClassName;
+        public int LineNumber;
+    }
+
+    private static CallerContext ResolveCaller(StackFrame caller)
+    {
+        CallerContext ctx = new CallerContext { FileThatContainMethod = "Unknown" };
+        if (caller?.GetMethod() is { } method)
+        {
+            ctx.LineNumber = caller.GetFileLineNumber();
+            ctx.ClassFullName = Utilites.RemoveIligalPathChars(method.DeclaringType?.FullName);
+            ctx.MethodName = Utilites.RemoveIligalPathChars(method.Name);
+            ctx.FileThatContainMethod = Utilites.RemoveIligalPathChars(method.Module?.ToString());
+            ctx.ClassName = Utilites.RemoveIligalPathChars(method.DeclaringType?.Name);
+        }
+        return ctx;
     }
 
     private void writeAdapterWrite(LogMesssageType messageType, string path, string message)
     {
-        foreach (ILogWrite logWrite in LogInstance?.writeAdapter)
+        List<ILogWrite>? adapters = null;
+        lock (_adapterLock)
+            adapters = LogInstance?.writeAdapter.ToList();
+        if (adapters == null)
+            return;
+        foreach (ILogWrite logWrite in adapters)
             logWrite.Write(messageType, path, message);
     }
-    private void writeAdapterWrite(LogLevel messageType, string path, string message)
+
+    private static string BuildMessage(object[] msg, string prefix = "")
     {
-        foreach (ILogWrite logWrite in LogInstance?.writeAdapter)
-            logWrite.Write(messageType, path, message);
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(prefix))
+            parts.Add(prefix);
+        if (msg != null)
+        {
+            foreach (var item in msg)
+            {
+                if (item == null)
+                    continue;
+                if (item is IEnumerable<object> enumerable)
+                {
+                    foreach (object node in enumerable)
+                    {
+                        if (node?.ToString() is string s)
+                            parts.Add(s);
+                    }
+                }
+                else if (item.ToString() is string s)
+                {
+                    parts.Add(s);
+                }
+            }
+        }
+        return string.Join("=>", parts);
     }
+
     public void WriteNew(Exception exIn, params object[] msg)
     {
         LogMesssageType logMesssageType = LogMesssageType.Exception;
         if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(logMesssageType))
             return;
-        try
+        StackFrame? caller = new StackTrace(exIn, true).GetFrame(0);
+        string? warning = null;
+        if (caller == null)
         {
-            string message = "";
-        
-            StackFrame caller = new StackTrace(exIn, true).GetFrame(0);
-            if (caller == null)
-            {
-                caller = new StackTrace().GetFrame(1);
-                message = "[WARNING Exception object did not Throwed and just Created!]";
-            }
-            bool CallerIsValid = caller != null;
-            string ClassFullName = string.Empty;
-            string MethodName = string.Empty;
-            string FileThatContainMethod = "Unknown";
-            string ClassName = string.Empty;
-            int LineNumber = 0;
-            if (CallerIsValid)
-            {
-                MethodBase method = caller.GetMethod();
-                LineNumber = caller.GetFileLineNumber();
-                if (method != null)
-                {
-                    ClassFullName = Utilites.RemoveIligalPathChars(method.DeclaringType?.FullName);
-                    MethodName = Utilites.RemoveIligalPathChars(method.Name);
-                    FileThatContainMethod = Utilites.RemoveIligalPathChars(method.Module?.ToString());
-                    ClassName = Utilites.RemoveIligalPathChars(method.DeclaringType?.Name);
-                }
-            }
-            string path = Path.Combine(FileThatContainMethod, ClassFullName, MethodName);
-            string pathException = Path.Combine("[All Exceptions]",path);
-            message = exIn.ToString();
-            if (exIn.InnerException != null)
-                message += $"{Environment.NewLine} InnerException = {exIn.InnerException}";
-            
-            foreach (var item in msg)
-            {
-                if (item != null)
-                {
-                    if (typeof(IEnumerable<object>).IsAssignableFrom(item.GetType()))
-                    {
-                        foreach (object message_node in (object[])item)
-                            message = message_node.ToString() + "=>";
-                    }
-                    else
-                        message = message + item.ToString() + "=>";
-                }
-            }
-
-            string HeaderDate = $"[{DateTime.Now:yyyy-MM-dd hh:mm:ss}][L:{LineNumber}]";
-            string HeaderType = $"[{logMesssageType}]";
-
-            try
-            {
-                writeAdapterWrite(logMesssageType, Path.Combine(pathException, $"{logMesssageType}.log"), HeaderDate + message);
-                writeAdapterWrite(logMesssageType, Path.Combine(path, $"{logMesssageType}.log"), HeaderDate + message);
-                writeAdapterWrite(logMesssageType, Path.Combine(path, "AllMessages.log"), HeaderDate + HeaderType + message);
-                writeAdapterWrite(logMesssageType, "AllMessages.log", $"{HeaderDate}{HeaderType}{FileThatContainMethod}\\{ClassName}-{message}");
-            }
-            catch (Exception ex)
-            {
-                try
-                {
-                    writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
-                        $"ErrMgs  = {ex.Message}{Environment.NewLine}" +
-                        $"Date    = {HeaderDate}{Environment.NewLine}" +
-                        $"type    = {HeaderType}{Environment.NewLine}" +
-                        $"path    = {path}{Environment.NewLine}" +
-                        $"message = {message}{Environment.NewLine}" +
-                        $"module  = {FileThatContainMethod}{Environment.NewLine}" +
-                        $"DeclaringType.Name= {ClassName}{Environment.NewLine}" +
-                        $"StackTrace = {ex.StackTrace}{Environment.NewLine}" +
-                        $"----------------------------------------------------------------------------{Environment.NewLine}");
-                }
-                catch
-                {
-                }
-            }
-            finally
-            {
-            }
+            caller = new StackTrace().GetFrame(1);
+            warning = "[WARNING Exception object did not Throwed and just Created!]";
         }
-        catch (StackOverflowException ex)
+        if (caller == null)
         {
+            // Last resort — no stack trace available at all
+            string fallbackMessage = $"{exIn}{Environment.NewLine}{BuildMessage(msg, "")}";
+            writeAdapterWrite(logMesssageType, "LogError.log", fallbackMessage);
+            return;
         }
-        catch (Exception ex)
-        {
-            try
-            {
-                writeAdapterWrite(LogMesssageType.Exception, "LogError.log",
-                    $"Date      = {DateTime.Now:yyyy-MM-dd hh:mm:ss}+{Environment.NewLine}" +
-                    $"Message   = {ex}{Environment.NewLine}" +
-                    $"----------------------------------------------------------------------{Environment.NewLine}");
-            }
-            catch
-            {
-            }
-        }
+        CallerContext ctx = ResolveCaller(caller);
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string pathException = Path.Combine("[All Exceptions]", path);
+        string messageBase = warning ?? exIn.ToString();
+        if (exIn.InnerException != null)
+            messageBase += $"{Environment.NewLine} InnerException = {exIn.InnerException}";
+        string message = BuildMessage(msg, messageBase);
+        WriteNewCore(logMesssageType, path, ctx, message, pathException);
     }
 
     public void Warrning(params object[] msg)

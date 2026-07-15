@@ -7,14 +7,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	  <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-	  <Platforms>AnyCpu;x86;x64;MISL</Platforms>
+	  <Platforms>AnyCpu;x86;x64;MSIL</Platforms>
 	  <LangVersion>latest</LangVersion>
 	  <Authors>aghili.mostafa@gmail.com</Authors>
 	  <Description>Extension for Logging in simple way.</Description>
 	  <Copyright>aghili.mostafa@gmail.com</Copyright>
 	  <PackageProjectUrl>https://www.nuget.org/packages/Aghili.Logging</PackageProjectUrl>
 	  <PackageReadmeFile>readme.md</PackageReadmeFile>
-	  <PackageTags>Logging;log;windows;Net9;Net6;netstandard;net8;console;windowsservice</PackageTags>
+	  <PackageTags>Logging;log;windows;Net6;netstandard;net8;console;windowsservice</PackageTags>
 	  <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
 	  <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>

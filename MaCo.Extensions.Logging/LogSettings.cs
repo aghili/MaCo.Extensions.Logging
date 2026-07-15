@@ -1,6 +1,6 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
-namespace Aghili.Logging;
+namespace MaCo.Extensions.Logging;
 
 public partial class Log
 {
@@ -17,5 +17,21 @@ public partial class Log
         public int LogKeepDataOnLimitRichedPercent { get; set; } = 80;
 
         public int LogRowLimitPerContainer { get; set; } = 10000;
-    }
+
+    public OnlineLoggerSettings Online { get; set; } = new OnlineLoggerSettings();
+}
+
+public class OnlineLoggerSettings
+{
+    public bool Enabled { get; set; } = false;
+
+    public string ApiEndpoint { get; set; } = "";
+
+    public string ApiKey { get; set; } = "";
+
+    public int BatchSize { get; set; } = 50;
+
+    public int UploadIntervalSeconds { get; set; } = 15;
+}
+
 }

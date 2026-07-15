@@ -1,4 +1,4 @@
-﻿namespace Aghili.Logging.Classes;
+namespace MaCo.Extensions.Logging.Classes;
 
 public interface IWriterOption
 {

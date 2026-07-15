@@ -1,7 +1,7 @@
-﻿
+
 using Microsoft.Extensions.Logging;
 
-namespace Aghili.Logging.Classes;
+namespace MaCo.Extensions.Logging.Classes;
 
 internal class LogWindowsEventAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 {

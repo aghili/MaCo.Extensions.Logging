@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
-namespace Aghili.Logging.Classes;
+namespace MaCo.Extensions.Logging.Classes;
 
 public interface ILogWrite : IDisposable, IEquatable<LogType>
 {
