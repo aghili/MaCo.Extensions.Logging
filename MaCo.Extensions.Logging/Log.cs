@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security;
@@ -150,12 +151,39 @@ public partial class Log
         WriteNewCore(type, path, ctx, message);
     }
 
+    public void WriteNew(LogMesssageType type, object[] msg,
+        [CallerMemberName] string member = "",
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0)
+    {
+        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(type))
+            return;
+        CallerContext ctx = BuildCallerContext(member, file, line);
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string message = BuildMessage(msg);
+        WriteNewCore(type, path, ctx, message);
+    }
+
     public void WriteNew(LogLevel type, params object[] msg)
     {
         LogMesssageType mapped = MapLogLevel(type);
         if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(mapped))
             return;
         CallerContext ctx = ResolveCaller(new StackTrace().GetFrame(1));
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string message = BuildMessage(msg);
+        WriteNewCore(mapped, path, ctx, message);
+    }
+
+    public void WriteNew(LogLevel type, object[] msg,
+        [CallerMemberName] string member = "",
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0)
+    {
+        LogMesssageType mapped = MapLogLevel(type);
+        if (!Settings.Enabled || !Settings.MesssageTypes.HasFlag(mapped))
+            return;
+        CallerContext ctx = BuildCallerContext(member, file, line);
         string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
         string message = BuildMessage(msg);
         WriteNewCore(mapped, path, ctx, message);
@@ -204,6 +232,27 @@ public partial class Log
         WriteNewCore(mapped, path, ctx, message);
     }
 
+    public void WriteNew<TState>(
+        LogLevel level,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter,
+        [CallerMemberName] string member = "",
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0)
+    {
+        if (!Settings.Enabled)
+            return;
+        LogMesssageType mapped = MapLogLevel(level);
+        if (!Settings.MesssageTypes.HasFlag(mapped))
+            return;
+        CallerContext ctx = BuildCallerContext(member, file, line);
+        string path = Path.Combine(ctx.FileThatContainMethod, ctx.ClassFullName, ctx.MethodName);
+        string message = formatter(state, exception);
+        WriteNewCore(mapped, path, ctx, message);
+    }
+
     private void WriteErrorLog(string headerDate, string headerType, string path, string message, CallerContext ctx, Exception ex)
     {
         try
@@ -231,6 +280,18 @@ public partial class Log
         public string FileThatContainMethod;
         public string ClassName;
         public int LineNumber;
+    }
+
+    private static CallerContext BuildCallerContext(string member, string file, int line)
+    {
+        return new CallerContext
+        {
+            LineNumber = line,
+            ClassFullName = Utilites.RemoveIligalPathChars(Path.GetFileNameWithoutExtension(file)),
+            MethodName = Utilites.RemoveIligalPathChars(member),
+            FileThatContainMethod = Utilites.RemoveIligalPathChars(file),
+            ClassName = Utilites.RemoveIligalPathChars(Path.GetFileNameWithoutExtension(file))
+        };
     }
 
     private static CallerContext ResolveCaller(StackFrame caller)
