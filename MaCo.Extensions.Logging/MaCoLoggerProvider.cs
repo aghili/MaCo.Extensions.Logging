@@ -16,5 +16,6 @@ public sealed class MaCoLoggerProvider : ILoggerProvider
 
     public void Dispose()
     {
+        Log.Dispose();
     }
 }

@@ -18,7 +18,7 @@ namespace MaCo.Extensions.Logging.Classes;
 public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 {
     private string ExecPath = "";
-    public object objectLock = new object();
+    private readonly object objectLock = new object();
     private readonly ConcurrentDictionary<string, LogEntity> LogEntites = new ConcurrentDictionary<string, LogEntity>();
     private Thread? LogWriter = null;
     private readonly AutoResetEvent _writeSignal = new(false);
@@ -32,49 +32,7 @@ public class LogFileAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 
     public LogType WriterType { get; internal set; } = LogType.File;
 
-    public LogFileAdapter() => InitialVariables();
-
-    private void InitialVariables()
-    {
-        string? GetExecutingAssemblyLocation = null;
-        try
-        {
-            GetExecutingAssemblyLocation = Assembly.GetExecutingAssembly().Location;
-            GetExecutingAssemblyLocation = string.IsNullOrEmpty(GetExecutingAssemblyLocation) ? null : Path.GetDirectoryName(GetExecutingAssemblyLocation);
-        }
-        catch
-        {
-        }
-        string? AppContextBaseDirectory = null;
-        try
-        {
-            AppContextBaseDirectory = AppContext.BaseDirectory;
-            AppContextBaseDirectory = string.IsNullOrEmpty(AppContextBaseDirectory) ? null : AppContextBaseDirectory;
-        }
-        catch
-        {
-        }
-        string? EnvironmentCurrentDirectory = null;
-        try
-        {
-            EnvironmentCurrentDirectory = Environment.CurrentDirectory;
-            EnvironmentCurrentDirectory = string.IsNullOrEmpty(EnvironmentCurrentDirectory) ? null : EnvironmentCurrentDirectory;
-        }
-        catch
-        {
-        }
-        string? TempFolder = null;
-        try
-        {
-            TempFolder = Path.GetTempPath();
-            TempFolder = string.IsNullOrEmpty(TempFolder) ? null : TempFolder;
-        }
-        catch 
-        { 
-        }
-
-        ExecPath = AppContextBaseDirectory ?? GetExecutingAssemblyLocation ?? TempFolder ?? EnvironmentCurrentDirectory ?? "";
-    }
+    public LogFileAdapter() => ExecPath = PathHelper.ResolveExecPath();
 
     private void HintOnWriterEngine()
     {

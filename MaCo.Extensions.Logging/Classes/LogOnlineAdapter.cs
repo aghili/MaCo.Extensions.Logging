@@ -32,31 +32,10 @@ internal class LogOnlineAdapter : ILogWrite, IDisposable, IEquatable<LogType>
 
     public LogOnlineAdapter()
     {
-        _execPath = ResolveExecPath();
+        _execPath = PathHelper.ResolveExecPath();
         _offlineDir = Path.Combine(_execPath, "Log", "Offline");
-        ConfigureClient();
         RecoverOfflineFiles();
         _uploadTask = Task.Run(UploadLoop);
-    }
-
-    private void ConfigureClient()
-    {
-        // Headers are set per-request in FlushAsync to avoid mutating shared static client.
-    }
-
-    private static string ResolveExecPath()
-    {
-        string? baseDir = null;
-        try { baseDir = AppContext.BaseDirectory; } catch { }
-        if (string.IsNullOrEmpty(baseDir))
-        {
-            try { baseDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); } catch { }
-        }
-        if (string.IsNullOrEmpty(baseDir))
-        {
-            try { baseDir = Path.GetTempPath(); } catch { }
-        }
-        return baseDir ?? "";
     }
 
     public void Write(LogMesssageType type, string path, string message) =>

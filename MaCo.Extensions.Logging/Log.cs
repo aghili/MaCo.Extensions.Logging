@@ -169,7 +169,7 @@ public partial class Log
         {
             writeAdapterWrite(type, Path.Combine(path, $"{type}.log"), headerDate + message);
             writeAdapterWrite(type, Path.Combine(path, "AllMessages.log"), headerDate + headerType + message);
-            writeAdapterWrite(type, "AllMessages.log", $"{headerDate}{headerType}{ctx.FileThatContainMethod}\\{ctx.ClassName}-{message}");
+            writeAdapterWrite(type, "AllMessages.log", $"{headerDate}{headerType}{ctx.FileThatContainMethod}{Path.DirectorySeparatorChar}{ctx.ClassName}-{message}");
             if (extraPath != null)
                 writeAdapterWrite(type, Path.Combine(extraPath, $"{type}.log"), headerDate + message);
         }

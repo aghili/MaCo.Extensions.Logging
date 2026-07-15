@@ -6,6 +6,7 @@ namespace MaCo.Extensions.Logging
      string name,
      Func<MaCoLoggerConfiguration> getCurrentConfig) : ILogger
     {
+        private readonly string _name = name;
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => default!;
 
         public bool IsEnabled(LogLevel logLevel) =>
@@ -23,13 +24,11 @@ namespace MaCo.Extensions.Logging
                 return;
             }
 
-            MaCoLoggerConfiguration config = getCurrentConfig();
+            string formattedMessage = formatter(state, exception);
+            string messageWithCategory = $"[{_name}] {formattedMessage}";
             MaCo.Extensions.Logging.Log.Instance.WriteNew(
                 logLevel,
-                eventId,
-                state,
-                exception,
-                formatter);
+                messageWithCategory);
         }
     }
 }
